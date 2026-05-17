@@ -1,0 +1,311 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #1a1c2c;
+  --bg-secondary: #2d2b55;
+  --bg-card: #3b3966;
+  --color-light: #f4f4f4;
+  --color-dim: #a0a0c0;
+  --accent-yellow: #f7c948;
+  --accent-red: #e63946;
+  --accent-green: #4cc9f0;
+  --accent-white: #ffffff;
+  --cell-dark: #2d2b55;
+  --cell-light: #3b3966;
+}
+
+/* ──── Base styles ──── */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Press Start 2P', monospace;
+    background-color: var(--bg-primary);
+    color: var(--color-light);
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    image-rendering: pixelated;
+  }
+
+  ::selection {
+    background-color: var(--accent-yellow);
+    color: black;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--bg-card);
+    border: 1px solid var(--color-dim);
+  }
+}
+
+/* ──── Arcade Utilities ──── */
+.pixel-border {
+  border: 3px solid var(--color-light);
+}
+.pixel-border-yellow {
+  border: 3px solid var(--accent-yellow);
+}
+.pixel-shadow {
+  box-shadow: 4px 4px 0px #000;
+}
+.pixel-shadow-interactive {
+  box-shadow: 4px 4px 0px #000;
+}
+.pixel-shadow-interactive:hover {
+  box-shadow: 6px 6px 0px #000;
+  transform: translate(-2px, -2px);
+}
+.pixel-shadow-active:active {
+  box-shadow: 0px 0px 0px #000;
+  transform: translate(4px, 4px);
+}
+.pixel-button {
+  background: var(--bg-card);
+  border: 3px solid var(--accent-yellow);
+  box-shadow: 4px 4px 0px #000;
+  color: var(--color-light);
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.pixel-button:hover {
+  box-shadow: 6px 6px 0px #000;
+  transform: translate(-2px, -2px);
+}
+.pixel-button:active {
+  box-shadow: 0px 0px 0px #000;
+  transform: translate(4px, 4px);
+}
+.arcade-text {
+  font-family: 'Press Start 2P', monospace;
+  text-transform: uppercase;
+}
+
+/* ──── Animations ──── */
+@keyframes blink {
+  0%, 49%   { filter: brightness(1); }
+  50%, 100% { filter: brightness(0.18) saturate(0.4); }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+@utility animate-marquee {
+  animation: marquee 15s linear infinite;
+  white-space: nowrap;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+
+/* ──── Capture animation ──── */
+@keyframes capture-shrink {
+  0%   { transform: scale(1.15); opacity: 1;   filter: brightness(8) saturate(0); }
+  15%  { transform: scale(1.3);  opacity: 1;   filter: brightness(4) saturate(0); }
+  50%  { transform: scale(0.6);  opacity: 0.7; filter: brightness(2) saturate(0); }
+  100% { transform: scale(0);    opacity: 0;   filter: brightness(1); }
+}
+
+@keyframes graveyard-pop {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.3) rotate(5deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+
+.animate-capture {
+  animation: capture-shrink 0.35s cubic-bezier(0.36, 0.07, 0.19, 0.97) forwards;
+}
+
+.animate-graveyard-pop {
+  animation: graveyard-pop 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ──── Turn indicator tilt ──── */
+.player-card {
+  transition: transform 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              box-shadow 0.2s ease,
+              border-color 0.15s ease;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+/* ──── Scroll Reveal Animations ──── */
+.reveal-hidden {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.delay-100 { transition-delay: 100ms; }
+.delay-200 { transition-delay: 200ms; }
+.delay-300 { transition-delay: 300ms; }
+
+/* ──── Page Transitions ──── */
+@keyframes iris-in {
+  0% {
+    clip-path: circle(0% at 50% 50%);
+    background-color: #000;
+  }
+  100% {
+    clip-path: circle(150% at 50% 50%);
+    background-color: transparent;
+  }
+}
+
+.animate-iris-in {
+  animation: iris-in 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* ──── Player ID Card Modal ──── */
+.player-id-card,
+.player-id-card *:not(svg):not(path):not(rect) {
+  font-family: 'Press Start 2P', monospace !important;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.player-id-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--color-light);
+  background: var(--bg-primary);
+  border: 3px solid var(--color-dim);
+  box-shadow: 2px 2px 0 #000;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.player-id-close:hover {
+  background: var(--accent-red);
+  border-color: var(--accent-red);
+  color: #000;
+}
+
+.player-id-avatar-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 3px solid var(--color-light);
+  box-shadow: 4px 4px 0 #000;
+  image-rendering: pixelated;
+}
+
+.player-id-name {
+  font-size: clamp(14px, 4.5vw, 20px);
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  text-shadow: 3px 3px 0 #000;
+}
+
+.player-id-city {
+  font-size: clamp(11px, 3.5vw, 14px);
+  line-height: 1.8;
+  letter-spacing: 0.08em;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-id-stat {
+  font-size: clamp(14px, 4vw, 18px);
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 #000;
+  white-space: nowrap;
+}
+
+.player-id-style-label {
+  font-size: clamp(12px, 3.8vw, 16px);
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  text-shadow: 2px 2px 0 #000;
+}
+
+.player-id-style-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: var(--bg-primary);
+  border: 2px solid var(--color-dim);
+  image-rendering: pixelated;
+}
+
+.player-id-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  width: 100%;
+}
+
+.player-id-divider-line {
+  flex: 1;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    var(--color-dim) 0,
+    var(--color-dim) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.5;
+}
+
+.player-id-divider-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--color-dim);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* ──── Paywall Modal ──── */
+.paywall-modal,
+.paywall-modal *:not(svg):not(path):not(rect) {
+  font-family: 'Press Start 2P', monospace !important;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
