@@ -30,6 +30,10 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     image-rendering: pixelated;
+    /* ── Mobile Optimizations ── */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
 
   ::selection {

@@ -14,16 +14,20 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or priceId' });
     }
 
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    const baseUrl = `${protocol}://${host}`;
+    // Use env var first (set SITE_URL in Vercel dashboard), fall back to request headers
+    const baseUrl = process.env.SITE_URL
+      || (() => {
+          const protocol = req.headers['x-forwarded-proto'] || 'http';
+          const host = req.headers['x-forwarded-host'] || req.headers.host;
+          return `${protocol}://${host}`;
+        })();
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       success_url: `${baseUrl}/play?session_id={CHECKOUT_SESSION_ID}&tier=${tier || 'pro'}`,
-      cancel_url: `${baseUrl}/plans`,
+      cancel_url: `${baseUrl}/play`,
       metadata: { userId: userId, tier: tier || 'pro' }
     });
 
