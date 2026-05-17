@@ -160,7 +160,10 @@ export default function LandingPage() {
             ) : (
               <Link to="/login" className="nav-google-btn arcade-text" style={{ textDecoration: 'none' }}>ВОЙТИ</Link>
             )}
-            <Link to="/play" className="pixel-button nav-play-btn">ИГРАТЬ →</Link>
+            {user
+              ? <Link to="/play" className="pixel-button nav-play-btn">НА БАЗУ</Link>
+              : <Link to="/login" className="pixel-button nav-play-btn">ИГРАТЬ →</Link>
+            }
           </div>
         </div>
       </nav>
@@ -179,9 +182,15 @@ export default function LandingPage() {
               Играй против AI. Получай разбор каждой партии. Узнай свой стиль мышления.
             </p>
             <div className="hero-buttons">
-              <Link to="/play" className="pixel-button hero-cta-primary">
-                ИГРАТЬ БЕСПЛАТНО
-              </Link>
+              {user ? (
+                <Link to="/play" className="pixel-button hero-cta-primary">
+                  ВЕРНУТЬСЯ НА БАЗУ
+                </Link>
+              ) : (
+                <Link to="/login" className="pixel-button hero-cta-primary">
+                  ИГРАТЬ БЕСПЛАТНО
+                </Link>
+              )}
               <button onClick={() => scrollTo('features')} className="hero-cta-secondary arcade-text">
                 КАК ЭТО РАБОТАЕТ
               </button>
@@ -249,34 +258,34 @@ export default function LandingPage() {
           ) : (
             <div className="lb-rows">
               {leaderboard.map((u, i) => {
-                let rowClass = 'lb-row flex items-center justify-between w-full gap-2 whitespace-nowrap';
-                if (i === 0) rowClass += ' lb-row-gold';
-                else if (i === 1) rowClass += ' lb-row-silver';
-                else if (i === 2) rowClass += ' lb-row-bronze';
+                const isGold = i === 0;
+                const isSilver = i === 1;
+                const isBronze = i === 2;
+                const rankColor = isGold ? 'var(--accent-yellow)' : isSilver ? '#c0c0c0' : isBronze ? '#cd7f32' : 'var(--color-dim)';
 
                 const Avatar = getArchetypeAvatar(u.best_archetype);
 
                 return (
-                  <div key={i} className={rowClass}>
-                    <div className="lb-left flex items-center gap-2 min-w-0 flex-1">
-                      <span className="lb-rank arcade-text flex-shrink-0">
-                        #{String(i + 1).padStart(2, '0')}
-                      </span>
-                      <span className="lb-name arcade-text flex-1 min-w-0 truncate">
-                        {u.username || u.name || 'UNKNOWN'}
-                      </span>
-                    </div>
-                    <div className="lb-right flex items-center gap-2 flex-shrink-0">
-                      <span className="lb-city arcade-text hidden sm:inline">
-                        {(u.city || u.location || 'UNKNOWN').toUpperCase()}
-                      </span>
-                      <span className="lb-score arcade-text flex-shrink-0 whitespace-nowrap">
-                        {u.wins || 0} WINS
-                      </span>
-                      <span className="lb-avatar flex-shrink-0 w-6 h-6 flex items-center justify-center">
-                        <Avatar size={24} />
-                      </span>
-                    </div>
+                  <div
+                    key={i}
+                    className="flex items-center w-full gap-2 px-4 py-3 hover:bg-white/5 transition-colors"
+                    style={{ ...(isGold ? { background: 'rgba(247,201,72,0.06)', outline: '2px solid var(--accent-yellow)', outlineOffset: '-2px' } : { borderBottom: '1px dashed rgba(160,160,192,0.12)' }) }}
+                  >
+                    <span className="arcade-text w-14 flex-shrink-0 whitespace-nowrap" style={{ color: rankColor, fontSize: '0.85rem' }}>
+                      #{String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="arcade-text text-[10px] flex-1 min-w-0 truncate text-[var(--color-light)]">
+                      {(u.username || u.name || 'UNKNOWN').toUpperCase()}
+                    </span>
+                    <span className="arcade-text text-[10px] hidden sm:block w-32 text-center flex-shrink-0 truncate text-[var(--color-dim)]">
+                      {(u.city || u.location || 'UNKNOWN').toUpperCase()}
+                    </span>
+                    <span className="arcade-text text-[10px] w-20 text-right flex-shrink-0 text-[var(--accent-green)] whitespace-nowrap">
+                      {u.wins || 0} WINS
+                    </span>
+                    <span className="w-10 flex-shrink-0 flex justify-center ml-2">
+                      <Avatar size={20} />
+                    </span>
                   </div>
                 );
               })}

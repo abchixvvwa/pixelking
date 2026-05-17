@@ -40,26 +40,6 @@ export const SKINS = [
     accent: '#f83800'
   },
   {
-    id: 'gold',
-    name: 'Золото',
-    free: false,
-    darkCell: '#3d2b00',
-    lightCell: '#5c4200',
-    whitePiece: '#f7c948',
-    blackPiece: '#3d2b00',
-    accent: '#ffffff'
-  },
-  {
-    id: 'ice',
-    name: 'Лёд',
-    free: false,
-    darkCell: '#0d1b2a',
-    lightCell: '#1b3a5c',
-    whitePiece: '#e0f4ff',
-    blackPiece: '#0d1b2a',
-    accent: '#4cc9f0'
-  },
-  {
     id: 'neon',
     name: 'Неоновый',
     free: false,
@@ -68,16 +48,6 @@ export const SKINS = [
     whitePiece: '#00f5ff',
     blackPiece: '#ff2bd6',
     accent: '#39ff14'
-  },
-  {
-    id: 'golden',
-    name: 'Золотой',
-    free: false,
-    darkCell: '#2a1f00',
-    lightCell: '#4a3500',
-    whitePiece: '#ffe566',
-    blackPiece: '#8b6914',
-    accent: '#f7c948'
   },
   {
     id: 'plasma',

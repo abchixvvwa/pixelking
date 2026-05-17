@@ -19,6 +19,15 @@ const useGameStore = create((set, get) => ({
   activeSkinState: 'classic', // initialized later or from getActiveSkin()
   onlineRole: null,           // 'white' | 'black' when gameMode === 'online'
   onlineChannel: null,        // Supabase Realtime channel ref
+  trainingMode: null,         // 'bug_bounty' | 'trap' | 'glitch' | null
+
+  // ──── Copilot & Placement state ────
+  copilotHintsLeft: 3,
+  copilotCooldown: 0,
+  isPlacementPhase: false,
+  aiAnalyzing: false,
+  placementPiece: 1,          // 1: white, 2: black, 3: white king, 4: black king
+  showOnboarding: false,
 
   // ──── Game state ────
   board: createInitialBoard(),
@@ -80,6 +89,8 @@ const useGameStore = create((set, get) => ({
       aiDifficulty: null,
       onlineRole: null,
       onlineChannel: null,
+      trainingMode: null,
+      showOnboarding: true,
     });
   },
 
@@ -96,6 +107,10 @@ const useGameStore = create((set, get) => ({
       aiDifficulty: difficulty,
       onlineRole: null,
       onlineChannel: null,
+      trainingMode: null,
+      copilotHintsLeft: 3,
+      copilotCooldown: 0,
+      showOnboarding: true,
     });
   },
 
@@ -107,6 +122,10 @@ const useGameStore = create((set, get) => ({
       gameMode: 'online',
       aiDifficulty: null,
       onlineRole: role,
+      trainingMode: null,
+      copilotHintsLeft: 2, // Hard limit for online
+      copilotCooldown: 0,
+      showOnboarding: true,
     });
   },
 
@@ -204,6 +223,11 @@ const useGameStore = create((set, get) => ({
     let newMoveSpeed = [...moveSpeed];
     let newCapturesChosen = capturesChosen;
     let newSacrifices = sacrifices;
+    
+    // ──── Copilot cooldown logic ────
+    if (currentPlayer === 'white' && get().copilotCooldown > 0) {
+      set({ copilotCooldown: get().copilotCooldown - 1 });
+    }
 
     if (currentPlayer === 'white' && lastMoveStartTime) {
       const elapsed = (Date.now() - lastMoveStartTime) / 1000;
@@ -367,7 +391,20 @@ const useGameStore = create((set, get) => ({
   },
 
   handleCellClick: (row, col) => {
-    const { selectedPiece, validMoves, board, currentPlayer, winner, gameMode, aiThinking, onlineRole } = get();
+    const { selectedPiece, validMoves, board, currentPlayer, winner, gameMode, aiThinking, onlineRole, isPlacementPhase, placementPiece } = get();
+    
+    if (isPlacementPhase) {
+      const newBoard = board.map(r => [...r]);
+      // Click empty cell -> place piece. Click existing piece -> remove piece.
+      if (newBoard[row][col] === 0) {
+        newBoard[row][col] = placementPiece;
+      } else {
+        newBoard[row][col] = 0;
+      }
+      set({ board: newBoard });
+      return;
+    }
+
     if (winner) return;
     if (aiThinking) return;
 
@@ -398,13 +435,42 @@ const useGameStore = create((set, get) => ({
   },
 
   resetGame: () => {
-    const { gameMode, aiDifficulty } = get();
+    const { gameMode, aiDifficulty, trainingMode } = get();
     const freshState = getInitialGameState();
     set({
       ...freshState,
       screen: 'game',
       gameMode,
       aiDifficulty,
+      trainingMode,
+      copilotHintsLeft: gameMode === 'online' ? 2 : 3,
+      copilotCooldown: 0,
+    });
+  },
+
+  useCopilotHint: () => {
+    const { copilotHintsLeft } = get();
+    if (copilotHintsLeft > 0) {
+      set({ 
+        copilotHintsLeft: copilotHintsLeft - 1,
+        copilotCooldown: 3 // Cooldown for 3 moves
+      });
+      return true;
+    }
+    return false;
+  },
+
+  setPlacementPiece: (piece) => set({ placementPiece: piece }),
+  togglePlacementPhase: () => set(s => ({ isPlacementPhase: !s.isPlacementPhase })),
+  startTrainingMode: (mode, customBoard = null) => {
+    set({
+      ...getInitialGameState(),
+      screen: 'game',
+      gameMode: 'local', // Or 'ai' depending on mode
+      trainingMode: mode,
+      board: customBoard || getInitialGameState().board,
+      isPlacementPhase: mode === 'trap',
+      showOnboarding: true,
     });
   },
 
@@ -463,6 +529,8 @@ function getInitialGameState() {
     sacrifices: 0,
     lastMoveStartTime: Date.now(),
     removingPieces: [],
+    isPlacementPhase: false,
+    showOnboarding: false,
   };
 }
 

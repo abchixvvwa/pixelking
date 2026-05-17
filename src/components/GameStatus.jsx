@@ -157,7 +157,7 @@ export default function GameStatus() {
   const playerName = (p) => (p === 'white' ? whiteLabel : blackLabel);
 
   return (
-    <div className="w-full max-w-[calc(min(95vw,600px))] mx-auto mt-4">
+    <div className="w-full max-w-3xl mx-auto mt-4">
       {/* Top Bar */}
       <div className="flex justify-between items-center mb-4">
         <button

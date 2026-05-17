@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import useGameStore from '../store/gameStore';
-import { supabase, getUser } from '../lib/supabase';
+import { supabase, getUser, signInWithGoogle } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
 import { analyzeAndSaveMistake } from '../logic/mistakeAnalyzer';
 
@@ -160,6 +160,14 @@ export default function GameOverScreen() {
   const [copied, setCopied] = useState(false);
   const coachRef = useRef(null);
   const streamStarted = useRef(false);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  // Track auth state
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUser(session?.user ?? null);
+    });
+  }, []);
 
   // Leaderboard state
   const [showModal, setShowModal] = useState(true);
@@ -196,22 +204,52 @@ export default function GameOverScreen() {
     localStorage.setItem('duels_username', username);
     localStorage.setItem('duels_city', city);
 
-    // Fetch existing user to update wins/losses
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Fetch existing user to update wins/losses/xp
     const { data: existingUser } = await supabase
       .from('leaderboard')
-      .select('id, wins, losses, total_games')
+      .select('id, wins, losses, total_games, xp')
       .eq('username', username)
       .single();
 
+    // Calculate best_archetype based on history
+    let finalArchetype = `${psychotype.emoji} ${psychotype.name}`;
+    if (user) {
+      const { data: history } = await supabase.from('match_history').select('archetype').eq('user_id', user.id);
+      if (history && history.length > 0) {
+        const counts = {};
+        history.forEach(h => {
+          if (h.archetype) counts[h.archetype] = (counts[h.archetype] || 0) + 1;
+        });
+        counts[finalArchetype] = (counts[finalArchetype] || 0) + 1; // Add current match
+        
+        let maxCount = 0;
+        for (const arch in counts) {
+          if (counts[arch] > maxCount) {
+            maxCount = counts[arch];
+            finalArchetype = arch;
+          }
+        }
+      }
+    }
+
     const isWin = isVictory;
+    let gainedXp = 10;
+    if (isWin) {
+      gainedXp = gameMode === 'ai' ? 20 : 50;
+    }
+    
     let newWins = isWin ? 1 : 0;
     let newLosses = !isWin ? 1 : 0;
     let newTotal = 1;
+    let newXp = gainedXp;
 
     if (existingUser) {
       newWins += existingUser.wins;
       newLosses += existingUser.losses;
       newTotal += existingUser.total_games;
+      newXp += existingUser.xp || 0;
     }
 
     await supabase.from('leaderboard').upsert({
@@ -221,9 +259,10 @@ export default function GameOverScreen() {
       wins: newWins,
       losses: newLosses,
       total_games: newTotal,
-      best_archetype: `${psychotype.emoji} ${psychotype.name}`,
+      xp: newXp,
+      best_archetype: finalArchetype,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'username' }); // upsert by default matches id or PK, if we want to match username it's better to ensure PK or handle manually. Wait, if id is provided it updates. If not, it inserts. This works correctly.
+    }, { onConflict: 'username' });
 
     setSubmitting(false);
     setShowModal(false);
@@ -324,93 +363,159 @@ export default function GameOverScreen() {
         )}
       </div>
 
-      {/* ──── Stats grid ──── */}
-      <div className="w-full max-w-sm mb-10 animate-fade-in bg-[var(--bg-card)] p-6 pixel-border" style={{ boxShadow: '6px 6px 0 #000' }}>
-        <h2 className="arcade-text text-sm text-[var(--color-light)] mb-6 text-center">STATISTICS</h2>
-        <div className="flex flex-col gap-4 font-mono text-sm">
-          <div className="flex justify-between items-center">
-            <span className="text-[#4cc9f0]">SCORE</span>
-            <span className="text-[var(--accent-yellow)] text-lg">{(totalMoves * 10 + capturedBlack * 50).toString().padStart(6, '0')}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[#4cc9f0]">MOVES</span>
-            <span className="text-[var(--accent-yellow)] text-lg">{totalMoves.toString().padStart(3, '0')}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[#4cc9f0]">AVG TIME</span>
-            <span className="text-[var(--accent-yellow)] text-lg">{avgThinkTime.toString().padStart(4, '0')}s</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-[#4cc9f0]">CAPTURES</span>
-            <span className="text-[var(--accent-yellow)] text-lg">{capturedBlack.toString().padStart(3, '0')}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* ──── AI Coach ──── */}
-      <div
-        className="w-full max-w-lg mb-8 animate-fade-in"
-        style={{ animationDelay: '0.3s' }}
-      >
-        <div className="flex items-center gap-2 mb-4">
-          <h2 className="text-lg font-bold text-white uppercase tracking-wider arcade-text text-sm">РАЗБОР ПАРТИИ</h2>
-          {!coachDone && (
-            <div className="flex gap-1 ml-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '300ms' }} />
+      {/* ──── 2x2 Grid Container ──── */}
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 px-4">
+        
+        {/* Top-Left: Psychotype */}
+        <div className="flex flex-col h-full animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <h2 className="arcade-text text-sm text-[var(--color-light)] mb-4 text-center">ИГРОВОЙ СТИЛЬ</h2>
+          <div className="p-6 text-center bg-[var(--bg-card)] pixel-border flex flex-col items-center flex-1" style={{ boxShadow: '6px 6px 0 #000' }}>
+            <div className="mb-4 mt-2">
+              <psychotype.Avatar size={80} />
             </div>
-          )}
-        </div>
-
-        <div
-          ref={coachRef}
-          className="rounded-2xl p-5 max-h-72 overflow-y-auto"
-          style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            scrollbarWidth: 'thin',
-          }}
-        >
-          {coachText ? (
-            <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">
-              {coachText}
-              {!coachDone && (
-                <span className="inline-block w-2 h-4 ml-0.5 bg-[#6C63FF] animate-pulse rounded-sm align-text-bottom" />
-              )}
-            </p>
-          ) : (
-            <SkeletonLoader />
-          )}
-        </div>
-      </div>
-
-      {/* ──── Psychotype (only after coach is done) ──── */}
-      {coachDone && (
-        <div
-          className="w-full max-w-lg mb-10 animate-fade-in"
-        >
-          <div
-            className="p-6 text-center bg-[var(--bg-card)] pixel-border flex flex-col items-center"
-            style={{ boxShadow: '6px 6px 0 #000' }}
-          >
-            <div className="text-xs text-[var(--color-dim)] font-mono tracking-widest mb-4 uppercase">
-              ТВОЙ СТИЛЬ ИГРЫ
-            </div>
-            <div className="mb-4">
-              <psychotype.Avatar size={64} />
-            </div>
-            <div className="text-xl arcade-text text-[var(--color-light)] mb-2">
+            <div className="text-2xl arcade-text text-[var(--accent-yellow)] mb-3">
               {psychotype.name.toUpperCase()}
             </div>
-            <div className="text-sm font-sans text-[var(--color-dim)] mb-6 font-bold">
+            <div className="text-sm font-sans text-[var(--color-dim)] mb-8 font-bold leading-relaxed flex-1 flex items-center justify-center">
               {psychotype.desc}
             </div>
-            <button
-              onClick={handleShare}
-              className="pixel-button w-full py-4 text-xs"
-            >
+            <button onClick={handleShare} className="pixel-button w-full mt-auto py-4 text-xs shadow-[4px_4px_0_#000] hover:translate-y-1 hover:shadow-none transition-all">
               {copied ? 'СКОПИРОВАНО!' : 'ПОДЕЛИТЬСЯ'}
+            </button>
+          </div>
+        </div>
+
+        {/* Top-Right: Stats */}
+        <div className="flex flex-col h-full animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <h2 className="arcade-text text-sm text-[var(--color-light)] mb-4 text-center">STATISTICS</h2>
+          <div className="bg-[var(--bg-card)] p-6 md:p-8 pixel-border flex-1 flex flex-col justify-center gap-6" style={{ boxShadow: '6px 6px 0 #000' }}>
+            <div className="flex justify-between items-center border-b-4 border-[var(--bg-primary)] pb-4">
+              <span className="arcade-text text-xs md:text-sm text-[#4cc9f0]">SCORE</span>
+              <span className="arcade-text text-[var(--accent-yellow)] text-xl md:text-2xl drop-shadow-md">{(totalMoves * 10 + capturedBlack * 50).toString().padStart(6, '0')}</span>
+            </div>
+            <div className="flex justify-between items-center border-b-4 border-[var(--bg-primary)] pb-4">
+              <span className="arcade-text text-xs md:text-sm text-[#4cc9f0]">MOVES</span>
+              <span className="arcade-text text-[var(--accent-yellow)] text-xl md:text-2xl drop-shadow-md">{totalMoves.toString().padStart(3, '0')}</span>
+            </div>
+            <div className="flex justify-between items-center border-b-4 border-[var(--bg-primary)] pb-4">
+              <span className="arcade-text text-xs md:text-sm text-[#4cc9f0]">AVG TIME</span>
+              <span className="arcade-text text-[var(--accent-yellow)] text-xl md:text-2xl drop-shadow-md">{avgThinkTime.toString().padStart(4, '0')}s</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="arcade-text text-xs md:text-sm text-[#4cc9f0]">CAPTURES</span>
+              <span className="arcade-text text-[var(--accent-yellow)] text-xl md:text-2xl drop-shadow-md">{capturedBlack.toString().padStart(3, '0')}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom-Left: AI Coach */}
+        <div className="flex flex-col h-full animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <h2 className="arcade-text text-sm text-[var(--color-light)]">ОБЩИЙ РАЗБОР</h2>
+            {!coachDone && (
+              <div className="flex gap-1 ml-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-[#6C63FF] animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start flex-1">
+            <div className="w-20 h-20 md:w-24 md:h-24 bg-[var(--bg-primary)] border-4 border-[var(--color-dim)] flex-shrink-0 flex items-center justify-center shadow-[4px_4px_0_#000]">
+              <svg width="48" height="48" viewBox="0 0 16 16" fill="none" style={{ imageRendering: 'pixelated' }}>
+                <rect x="3" y="2" width="10" height="9" fill="#1a1c2c"/>
+                <rect x="4" y="3" width="8" height="7" fill="#4cc9f0"/>
+                <rect x="5" y="4" width="2" height="2" fill="#1a1c2c"/>
+                <rect x="9" y="4" width="2" height="2" fill="#1a1c2c"/>
+                <rect x="6" y="7" width="4" height="1" fill="#1a1c2c"/>
+                <rect x="7" y="11" width="2" height="2" fill="#1a1c2c"/>
+                <rect x="4" y="13" width="8" height="3" fill="#e63946"/>
+              </svg>
+            </div>
+            <div className="flex-1 bg-[var(--bg-card)] border-4 border-[var(--color-dim)] p-5 relative min-h-[96px] h-full shadow-[4px_4px_0_#000] flex flex-col">
+              <div className="hidden md:block absolute top-6 -left-[14px] w-5 h-5 bg-[var(--bg-card)] border-l-4 border-b-4 border-[var(--color-dim)] transform rotate-45" />
+              <div className="md:hidden absolute -top-[14px] left-6 w-5 h-5 bg-[var(--bg-card)] border-t-4 border-l-4 border-[var(--color-dim)] transform rotate-45" />
+              
+              <div 
+                ref={coachRef} 
+                className="flex-1 max-h-60 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-[var(--color-dim)] [&::-webkit-scrollbar-track]:bg-transparent pr-2"
+              >
+                {coachText ? (
+                  <p className="font-sans text-sm text-[var(--color-light)] leading-relaxed relative z-10">
+                    {coachText.replace(/[*_~`#]/g, '').trim()}
+                    {!coachDone && <span className="inline-block w-2 h-4 ml-1 bg-[var(--accent-yellow)] animate-pulse align-text-bottom" />}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2 opacity-50">
+                     <div className="h-3 bg-[var(--color-dim)] w-3/4" />
+                     <div className="h-3 bg-[var(--color-dim)] w-1/2" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom-Right: PRO MAX Teaser */}
+        <div className="flex flex-col h-full animate-fade-in relative" style={{ animationDelay: '0.4s' }}>
+          <h2 className="arcade-text text-sm text-[var(--color-dim)] text-center mb-4">ПОШАГОВЫЙ АНАЛИЗ ОШИБОК</h2>
+          
+          <div className="flex-1 relative flex flex-col bg-[var(--bg-card)] border-4 border-[var(--color-dim)] shadow-[4px_4px_0_#000] overflow-hidden">
+            <div className="flex-1 p-5 blur-md opacity-40 pointer-events-none flex flex-col justify-between gap-3">
+              {[1,2,3].map(i => (
+                 <div key={i} className="bg-[var(--bg-primary)] border-2 border-white/5 p-3 flex gap-4 items-center">
+                    <span className="arcade-text text-[10px] text-[var(--color-dim)]">{i}.</span>
+                    <span className="arcade-text text-xs text-[var(--accent-yellow)]">e2-e4</span>
+                    <span className="font-sans text-[10px] md:text-xs text-white">Не лучший ход, ослабляет защиту.</span>
+                 </div>
+              ))}
+            </div>
+            
+            {/* Paywall Overlay */}
+            <div className="absolute inset-0 z-10 flex items-center justify-center p-4 md:p-6 bg-black/20">
+              <div className="bg-[var(--bg-primary)] border-4 border-[var(--accent-yellow)] p-6 md:p-8 w-full max-w-sm text-center shadow-[10px_10px_0_rgba(0,0,0,0.9)]">
+                <div className="flex justify-center mb-5">
+                  <svg width="40" height="40" viewBox="0 0 16 16" fill="none" style={{ imageRendering: 'pixelated' }}>
+                    <rect x="5" y="2" width="6" height="5" fill="#f7c948"/>
+                    <rect x="6" y="3" width="4" height="4" fill="#1a1c2c"/>
+                    <rect x="4" y="6" width="8" height="8" fill="#f7c948"/>
+                    <rect x="7" y="9" width="2" height="3" fill="#1a1c2c"/>
+                  </svg>
+                </div>
+                <h3 className="arcade-text text-[10px] md:text-xs text-white mb-5 leading-relaxed tracking-wider">
+                  РАЗБОР КАЖДОГО ХОДА ДОСТУПЕН В PRO MAX.
+                </h3>
+                <button 
+                  className="w-full pixel-button !bg-[#d9b042] !text-black !border-black py-4 arcade-text text-[10px] animate-pulse hover:animate-none hover:-translate-y-1 transition-transform shadow-[4px_4px_0_#000]"
+                  onClick={() => window.alert('Открывается оплата...')}
+                >
+                  РАЗБЛОКИРОВАТЬ
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ──── Guest Register Banner ──── */}
+      {!currentUser && (
+        <div className="w-full max-w-sm mb-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+          <div
+            className="p-5 text-center"
+            style={{ background: 'rgba(247,201,72,0.07)', border: '3px solid var(--accent-yellow)', boxShadow: '4px 4px 0 #000' }}
+          >
+            <div className="arcade-text text-xs text-[var(--accent-yellow)] mb-2 animate-pulse">
+              ⚠️ РЕЗУЛЬТАТ НЕ СОХРАНЁН!
+            </div>
+            <p className="text-xs text-[var(--color-dim)] mb-4 font-sans">
+              Зарегистрируйся, чтобы сохранять прогресс, попасть в лидерборд и получать разбор ошибок
+            </p>
+            <button
+              onClick={signInWithGoogle}
+              className="w-full pixel-button py-3 text-xs arcade-text !bg-[var(--accent-yellow)] !text-black !border-black"
+            >
+              ЗАРЕГИСТРИРОВАТЬСЯ ЧЕРЕЗ GOOGLE
             </button>
           </div>
         </div>

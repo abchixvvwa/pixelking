@@ -1,4 +1,4 @@
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import useGameStore from './store/gameStore';
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
@@ -13,9 +13,33 @@ import DailyChallenge from './components/DailyChallenge';
 import Leaderboard from './components/Leaderboard';
 import Shop from './components/Shop';
 import OnlineGame from './pages/OnlineGame';
+import AICopilot from './components/AICopilot';
+import LoaderOverlay from './components/LoaderOverlay';
+import PlacementControls from './components/PlacementControls';
+import OnboardingModal from './components/OnboardingModal';
 import { getActiveSkin } from './data/skins';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { PixelKingLogo } from './components/icons/PixelIcons';
+import { supabase } from './lib/supabase';
+
+// ── Protected Route ──
+function ProtectedRoute({ children }) {
+  const [user, setUser] = useState(undefined); // undefined = loading
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  if (user === undefined) return null; // still loading
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
 
 export default function App() {
   const setActiveSkinState = useGameStore((s) => s.setActiveSkinState);
@@ -34,16 +58,17 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/plans" element={<Plans />} />
-      <Route path="/play" element={<Dashboard />} />
+      <Route path="/play" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/play/vs-player" element={<GameWrapper />} />
-      <Route path="/play/online/:roomId" element={<OnlineGame />} />
+      <Route path="/play/online/:roomId" element={<ProtectedRoute><OnlineGame /></ProtectedRoute>} />
       <Route path="/play/vs-ai" element={<DifficultyWrapper />} />
       <Route path="/play/vs-ai-game" element={<GameWrapper />} />
       <Route path="/play/daily" element={<DailyWrapper />} />
       <Route path="/play/leaderboard" element={<LeaderboardWrapper />} />
       <Route path="/play/skins" element={<ShopWrapper />} />
-      <Route path="/play/trainer" element={<Trainer />} />
-      <Route path="/play/train" element={<Trainer />} />
+      <Route path="/play/trainer" element={<ProtectedRoute><Trainer /></ProtectedRoute>} />
+      <Route path="/play/trap" element={<ProtectedRoute><TrapWrapper /></ProtectedRoute>} />
+      <Route path="/play/train" element={<ProtectedRoute><Trainer /></ProtectedRoute>} />
     </Routes>
   );
 }
@@ -73,6 +98,14 @@ function ShopWrapper() {
   return <Shop onBack={() => navigate(-1)} />;
 }
 
+function TrapWrapper() {
+  const startTrainingMode = useGameStore(s => s.startTrainingMode);
+  useEffect(() => {
+    startTrainingMode('trap');
+  }, [startTrainingMode]);
+  return <GameScreen />;
+}
+
 function GameScreen() {
   const gameMode = useGameStore((s) => s.gameMode);
   const aiDifficulty = useGameStore((s) => s.aiDifficulty);
@@ -83,14 +116,18 @@ function GameScreen() {
     ? `VS ${BOT_NAMES[aiDifficulty] ?? aiDifficulty.toUpperCase()}`
     : 'VS PLAYER';
 
+  const isPlacementPhase = useGameStore(s => s.isPlacementPhase);
+  const aiAnalyzing = useGameStore(s => s.aiAnalyzing);
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-[var(--bg-primary)]">
+      <OnboardingModal />
       {/* Header */}
-      <header className="mb-4 text-center relative w-full max-w-[calc(min(95vw,600px))] mx-auto flex items-center justify-between">
-        <h1 className="text-xl md:text-3xl arcade-text text-[var(--color-light)] flex items-center">
-          <img src="/logo.png" alt="PIXELKING" className="h-8 md:h-12" />
+      <header className="mb-4 text-center relative w-full max-w-3xl mx-auto flex items-center justify-between">
+        <h1 className="text-xl md:text-3xl arcade-text text-[var(--accent-yellow)] drop-shadow-md flex items-center">
+          PIXELKING
         </h1>
-        <p className="arcade-text text-[10px] text-[var(--accent-yellow)]">
+        <p className="arcade-text text-[10px] text-[var(--color-dim)]">
           {subtitle}
         </p>
       </header>
@@ -100,7 +137,11 @@ function GameScreen() {
         <Board />
       </div>
 
-      <GameStatus />
+      {isPlacementPhase && <PlacementControls />}
+      {!isPlacementPhase && <GameStatus />}
+      
+      {gameMode === 'ai' && !isPlacementPhase && <AICopilot />}
+      {aiAnalyzing && <LoaderOverlay text="ANALYZING TRAJECTORIES..." />}
     </div>
   );
 }

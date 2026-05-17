@@ -152,74 +152,71 @@ export default function Leaderboard({ onBack }) {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />
+              <div key={i} className="h-14 animate-pulse" style={{ background: 'rgba(255,255,255,0.03)' }} />
             ))}
           </div>
         ) : activeTab === 'global' ? (
           <>
-            {/* Top 3 Cards */}
-            {top3.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                {top3.map((p, i) => (
+            {/* ── Header row (column labels) ── */}
+            <div className="flex items-center w-full gap-2 px-4 py-2 mb-1 border-b-2 border-[var(--color-dim)]/30">
+              <span className="arcade-text text-[8px] text-[var(--color-dim)] w-14 flex-shrink-0">#</span>
+              <span className="arcade-text text-[8px] text-[var(--color-dim)] w-10 flex-shrink-0"></span>
+              <span className="arcade-text text-[8px] text-[var(--color-dim)] flex-1 min-w-0">PLAYER</span>
+              <span className="arcade-text text-[8px] text-[var(--color-dim)] w-20 text-right flex-shrink-0">WINS</span>
+              <span className="arcade-text text-[8px] text-[var(--color-dim)] w-10 flex-shrink-0 text-center">TYPE</span>
+            </div>
+
+            {/* ── All rows unified ── */}
+            <div className="flex flex-col">
+              {filteredPlayers.map((p, i) => {
+                const { Avatar, label } = getArchetypeInfo(p.best_archetype);
+                const isGold   = i === 0;
+                const isSilver = i === 1;
+                const isBronze = i === 2;
+                const rankColor = isGold ? 'var(--accent-yellow)' : isSilver ? '#c0c0c0' : isBronze ? '#cd7f32' : 'var(--color-dim)';
+
+                return (
                   <div
                     key={p.id}
                     onClick={() => setSelectedPlayer(p)}
-                    className="relative flex flex-col items-center p-6 bg-[var(--bg-card)] pixel-border pixel-shadow cursor-pointer hover:bg-[#1e3a8a] group transition-colors"
+                    className="flex items-center w-full gap-2 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors"
+                    style={{ ...(isGold ? { background: 'rgba(247,201,72,0.06)', outline: '2px solid var(--accent-yellow)', outlineOffset: '-2px' } : { borderBottom: '1px dashed rgba(160,160,192,0.12)' }) }}
                   >
-                    <div className="absolute top-2 right-2 text-2xl animate-blink">
-                      {i === 0 ? <PixelTrophy size={20} /> : ''}
-                    </div>
-                    <div className="text-3xl mb-2 arcade-text text-[var(--accent-yellow)]">#{i + 1}</div>
-                    <div className="arcade-text text-[10px] md:text-xs text-[var(--color-light)] mb-2 text-center truncate w-full group-hover:text-[var(--accent-yellow)]" style={{ minWidth: 0 }}>{p.username || p.name || 'UNKNOWN'}</div>
-                    <div className="arcade-text text-[10px] text-[var(--color-dim)] mb-4">{p.city || 'Неизвестно'}</div>
-                    <div className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <span className="arcade-text text-[10px] text-[var(--color-dim)] mb-1">WINS</span>
-                        <span className="arcade-text text-[10px] text-[var(--color-light)] whitespace-nowrap">{p.wins}</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <span className="arcade-text text-[10px] text-[var(--color-dim)] mb-1">RATE</span>
-                        <span className="arcade-text text-[10px] text-[var(--accent-green)] whitespace-nowrap">{p.total_games > 0 ? ((p.wins / p.total_games) * 100).toFixed(1) : 0}%</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                    {/* COL 1: Rank */}
+                    <span
+                      className="arcade-text w-14 flex-shrink-0 whitespace-nowrap"
+                      style={{ color: rankColor, fontSize: isGold ? '1rem' : isSilver ? '0.85rem' : '0.7rem' }}
+                    >
+                      #{String(i + 1).padStart(2, '0')}
+                    </span>
 
-            {/* Others Table */}
-            {others.length > 0 && (
-              <div className="bg-[var(--bg-card)] pixel-border overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="arcade-text text-[10px] text-[var(--color-dim)] border-b-2 border-[var(--bg-primary)]">
-                      <th className="p-3 w-12 text-center">#</th>
-                      <th className="p-3">PLAYER</th>
-                      <th className="p-3 hidden sm:table-cell">CITY</th>
-                      <th className="p-3 text-center">WINS</th>
-                      <th className="p-3 text-center">RATE</th>
-                      <th className="p-3 hidden md:table-cell">STYLE</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {others.map((p, i) => (
-                      <tr key={p.id} onClick={() => setSelectedPlayer(p)} className="cursor-pointer hover:bg-[#1e3a8a] transition-colors border-b border-[var(--bg-primary)] arcade-text text-[10px] group flex sm:table-row flex-wrap sm:flex-nowrap items-center justify-between">
-                        <td className="p-3 text-center text-[var(--color-dim)] group-hover:text-white whitespace-nowrap">{i + 4}</td>
-                        <td className="p-3 text-[var(--color-light)] group-hover:text-[var(--accent-yellow)] truncate max-w-[120px] sm:max-w-none">{(p.username || p.name || 'UNKNOWN').slice(0,10)}</td>
-                        <td className="p-3 text-[var(--color-dim)] hidden sm:table-cell group-hover:text-white truncate">{(p.city || 'Неизвестно').slice(0,10)}</td>
-                        <td className="p-3 text-center text-[var(--color-light)] group-hover:text-white whitespace-nowrap">{p.wins}</td>
-                        <td className="p-3 text-center text-[var(--accent-green)] group-hover:text-[#4ade80] whitespace-nowrap">{p.total_games > 0 ? ((p.wins / p.total_games) * 100).toFixed(1) : 0}%</td>
-                        <td className="p-3 text-[var(--color-dim)] hidden md:table-cell group-hover:text-white whitespace-nowrap">{getArchetypeInfo(p.best_archetype).label}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    {/* COL 2: Avatar */}
+                    <span className="w-10 flex-shrink-0 flex justify-center">
+                      <Avatar size={24} />
+                    </span>
+
+                    {/* COL 3: Name */}
+                    <span className="arcade-text text-[10px] flex-1 min-w-0 truncate text-[var(--color-light)]">
+                      {(p.username || p.name || 'UNKNOWN').toUpperCase()}
+                    </span>
+
+                    {/* COL 4: Wins */}
+                    <span className="arcade-text text-[10px] w-20 text-right flex-shrink-0 text-[var(--accent-green)] whitespace-nowrap">
+                      {p.wins} П
+                    </span>
+
+                    {/* COL 5: Archetype icon */}
+                    <span className="w-10 flex-shrink-0 flex justify-center" title={label}>
+                      <Avatar size={20} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
 
             {filteredPlayers.length === 0 && (
-              <div className="text-center py-12 text-gray-500">
-                Ничего не найдено
+              <div className="arcade-text text-xs text-center py-12 text-[var(--color-dim)]">
+                НИЧЕГО НЕ НАЙДЕНО
               </div>
             )}
           </>

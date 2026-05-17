@@ -96,9 +96,18 @@ export default function Board() {
 
   return (
     <div className={`relative select-none w-full flex justify-center ${inputLocked ? 'pointer-events-none' : ''}`}>
-      <div className="w-full max-w-[calc(min(95vw,600px))] mx-auto select-none">
-        <div className={`w-full aspect-square relative pixel-border bg-[var(--bg-primary)] pixel-shadow flex flex-col justify-between p-2 md:p-3 ${onlineBlocked ? 'opacity-90' : ''}`}>
-          <div className="relative grid grid-cols-8 grid-rows-8 aspect-square border-4 border-[var(--bg-primary)] flex-1 w-full h-full">
+      <div className="w-full max-w-3xl mx-auto select-none px-4 md:px-6">
+        <div className="flex">
+          {/* Y axis coordinates (1-8) */}
+          <div className="w-4 md:w-6 flex flex-col justify-around items-center py-2 md:py-3 pr-2 md:pr-3 mb-4 md:mb-6 mt-[2px] md:mt-[4px]">
+            {[8, 7, 6, 5, 4, 3, 2, 1].map(n => (
+              <span key={n} className="arcade-text text-[8px] md:text-[10px] text-[var(--color-dim)] h-full flex items-center">{n}</span>
+            ))}
+          </div>
+          
+          <div className="flex-1 flex flex-col">
+            <div className={`w-full aspect-square relative pixel-border bg-[var(--bg-primary)] pixel-shadow p-1 md:p-2 ${onlineBlocked ? 'opacity-90' : ''}`}>
+              <div className="relative grid grid-cols-8 grid-rows-8 border-[3px] border-[var(--bg-primary)] w-full h-full">
 
             {/* ── Cells ── */}
             {board.map((row, r) =>
@@ -163,17 +172,6 @@ export default function Board() {
                       </div>
                     )}
 
-                    {/* Coordinates */}
-                    {c === 0 && (
-                      <span className="absolute left-1 top-1 text-[8px] opacity-50 arcade-text pointer-events-none" style={{ color: skin.lightCell }}>
-                        {8 - r}
-                      </span>
-                    )}
-                    {r === 7 && (
-                      <span className="absolute right-1 bottom-1 text-[8px] opacity-50 arcade-text pointer-events-none" style={{ color: skin.lightCell }}>
-                        {String.fromCharCode(97 + c).toUpperCase()}
-                      </span>
-                    )}
                   </div>
                 );
               })
@@ -193,6 +191,15 @@ export default function Board() {
                 </span>
               </div>
             )}
+            </div>
+            </div>
+            
+            {/* X axis coordinates (A-H) */}
+            <div className="flex justify-around items-center h-4 md:h-6 mt-2 mb-2 px-1 md:px-2">
+              {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(l => (
+                <span key={l} className="arcade-text text-[8px] md:text-[10px] text-[var(--color-dim)] flex-1 text-center">{l}</span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
