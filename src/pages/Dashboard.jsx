@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import useGameStore from '../store/gameStore';
 import useDailyStore from '../store/dailyStore';
 import { getTodayChallenge } from '../data/dailyChallenges';
@@ -14,6 +14,7 @@ import MatchDetailModal from '../components/MatchDetailModal';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [playerName, setPlayerName] = useState(localStorage.getItem('duels_player_name') || localStorage.getItem('duels_username') || '');
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(playerName);
@@ -77,6 +78,28 @@ export default function Dashboard() {
 
     return () => subscription?.unsubscribe();
   }, [initDaily]);
+
+  // Fallback for Stripe payment success
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id');
+    const tier = searchParams.get('tier');
+    
+    if (sessionId && tier && user) {
+      supabase
+        .from('profiles')
+        .update({ subscriptionTier: tier })
+        .eq('id', user.id)
+        .then(({ error }) => {
+          if (!error) {
+            alert(`Успешно! Тариф ${tier.toUpperCase()} активирован.`);
+          }
+          searchParams.delete('session_id');
+          searchParams.delete('tier');
+          setSearchParams(searchParams);
+          fetchStats(user);
+        });
+    }
+  }, [searchParams, user, setSearchParams]);
 
   async function fetchHistory(userId) {
     try {

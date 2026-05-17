@@ -1,12 +1,66 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
 import useScrollReveal from '../hooks/useScrollReveal';
 import { PixelCheck, PixelCross, PixelStar, PixelCrown, PixelRocket } from '../components/icons/PixelIcons';
+import { supabase, signInWithGoogle } from '../lib/supabase';
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder');
 
 export default function Plans() {
   useScrollReveal();
   const navigate = useNavigate();
-  const handleCheckout = () => {
-    alert('Оплата скоро! Следите за обновлениями');
+  const [user, setUser] = useState(null);
+  const [loadingTier, setLoadingTier] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user || null);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  const handleCheckout = async (tier, priceId) => {
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
+
+    setLoadingTier(tier);
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          priceId: priceId,
+          tier: tier
+        }),
+      });
+
+      const { sessionId, url, error } = await response.json();
+
+      if (error) {
+        throw new Error(error);
+      }
+
+      if (url) {
+        window.location.href = url;
+      } else if (sessionId) {
+        const stripe = await stripePromise;
+        await stripe.redirectToCheckout({ sessionId });
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      alert('Ошибка при создании сессии оплаты. Попробуйте позже.');
+    } finally {
+      setLoadingTier(null);
+    }
   };
 
   return (
@@ -56,8 +110,12 @@ export default function Plans() {
             <div className="flex items-start gap-3 opacity-50"><PixelCross size={16} color="var(--accent-red)" /> <span>Глубокая статистика</span></div>
           </div>
 
-          <button onClick={handleCheckout} className="w-full text-center py-4 bg-[var(--accent-yellow)] text-black hover:bg-white arcade-text text-xs transition-colors">
-            ПОПРОБОВАТЬ 7 ДНЕЙ
+          <button 
+            onClick={() => handleCheckout('pro', import.meta.env.VITE_STRIPE_PRO_PRICE_ID || 'price_123_pro')} 
+            disabled={loadingTier === 'pro'}
+            className="w-full text-center py-4 bg-[var(--accent-yellow)] text-black hover:bg-white arcade-text text-xs transition-colors"
+          >
+            {loadingTier === 'pro' ? 'ЗАГРУЗКА...' : 'ПОПРОБОВАТЬ 7 ДНЕЙ'}
           </button>
         </div>
 
@@ -76,8 +134,12 @@ export default function Plans() {
             <div className="flex items-start gap-3"><PixelCheck size={16} color="var(--accent-green)" /> <span>Приоритет в матчмейкинге</span></div>
           </div>
 
-          <button onClick={handleCheckout} className="w-full text-center py-4 bg-[#ffb703] text-black hover:bg-white arcade-text text-xs transition-colors">
-            ПОПРОБОВАТЬ 7 ДНЕЙ
+          <button 
+            onClick={() => handleCheckout('pro_max', import.meta.env.VITE_STRIPE_PRO_MAX_PRICE_ID || 'price_123_promax')} 
+            disabled={loadingTier === 'pro_max'}
+            className="w-full text-center py-4 bg-[#ffb703] text-black hover:bg-white arcade-text text-xs transition-colors"
+          >
+            {loadingTier === 'pro_max' ? 'ЗАГРУЗКА...' : 'ПОПРОБОВАТЬ 7 ДНЕЙ'}
           </button>
         </div>
 
