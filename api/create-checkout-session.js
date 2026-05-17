@@ -14,14 +14,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing userId or priceId' });
     }
 
-    const siteUrl = process.env.VITE_SITE_URL || process.env.SITE_URL || 'http://localhost:5173';
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const baseUrl = `${protocol}://${host}`;
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${siteUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&tier=${tier || 'pro'}`,
-      cancel_url: `${siteUrl}/plans`,
+      success_url: `${baseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&tier=${tier || 'pro'}`,
+      cancel_url: `${baseUrl}/plans`,
       metadata: { userId: userId, tier: tier || 'pro' }
     });
 
