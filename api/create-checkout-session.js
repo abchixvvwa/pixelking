@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
-      success_url: `${baseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&tier=${tier || 'pro'}`,
+      success_url: `${baseUrl}/play?session_id={CHECKOUT_SESSION_ID}&tier=${tier || 'pro'}`,
       cancel_url: `${baseUrl}/plans`,
       metadata: { userId: userId, tier: tier || 'pro' }
     });
