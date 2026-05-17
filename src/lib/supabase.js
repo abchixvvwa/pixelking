@@ -20,11 +20,22 @@ export const supabase = createClient(
   supabaseKey || 'placeholder-key'
 );
 
-export const signInWithGoogle = () =>
-  supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin + '/play' }
-  });
+export const signInWithGoogle = async () => {
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        // Динамически подставляет текущий домен (Vercel или локальный localhost:3000)
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error signing in with Google:', error.message);
+    throw error;
+  }
+};
 
 export const signOut = () => {
   localStorage.removeItem('duels_last_game');
